@@ -23,13 +23,13 @@ with open(file, 'rb') as fid:
             print(A.shape)
             
     A = np.fromfile(fid, count=info[0], dtype=np.int16)
-    np.delete(A, np.s_[0:4])
+    A = np.delete(A, np.s_[0:4])
     print(A.shape)
 
-#    for i in range(n_block_to_process-1):
-#        B = np.fromfile(fid, count=info[0], dtype=np.int16)[0]
-#        np.delete(B, np.s_[0:4])
-#        A = np.concatenate(A, B)
+    for i in range(n_block_to_process-1):
+        B = np.fromfile(fid, count=info[0], dtype=np.int16)[0]
+        np.delete(B, np.s_[0:4])
+        A = np.concatenate(A, B)
         
 #print(A.size)
         

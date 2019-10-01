@@ -18,7 +18,7 @@ from numpy import pi, exp, log10
 from numpy.fft import fft, fftshift
 
 
-save_code = True
+save_code = False
 
 # %% Load Code
 code = loadmat('code.mat')['codes']
@@ -54,6 +54,7 @@ code1_rep = np.tile(code1, repeat_time_in_each_period)
 code2_rep = np.tile(code2, repeat_time_in_each_period)
 
 code1_tc = np.repeat(code1_rep[0:code_length_for_periods], duration_grid)
+code2_tc = np.repeat(code2_rep[0:code_length_for_periods], duration_grid)
 period_length = code1_tc.size
 
 center_wave = exp(2j*pi*center_frequency*np.arange(period_length)*sampling_interval)
@@ -62,23 +63,26 @@ center_wave = exp(2j*pi*center_frequency*np.arange(period_length)*sampling_inter
 Tz = 1e-3 - T                           # Tz for zeros
 Nz = int(np.ceil(Tz / Tc * duration_grid))
 
-transmit_period = np.zeros((code1_tc.size + Nz, ), dtype=complex)
-transmit_period[0:code1_tc.size] = center_wave * code1_tc
+transmit_period1 = np.zeros((code1_tc.size + Nz, ), dtype=complex)
+transmit_period1[0:code1_tc.size] = center_wave * code1_tc
+
+transmit_period2 = np.zeros((code2_tc.size + Nz, ), dtype=complex)
+transmit_period2[0:code2_tc.size] = center_wave * code2_tc
 # %%
 plt.figure()
 plt.plot(code1_tc[0:200])
 plt.figure()
-plt.plot(transmit_period.real[0:200])
+plt.plot(transmit_period1.real[0:200])
 
 plt.figure()
-plt.plot(np.linspace(-600, 600, transmit_period.size), (20*log10(abs(fftshift(fft(transmit_period.real))) + 1e-50)))
+plt.plot(np.linspace(-600, 600, transmit_period1.size), (20*log10(abs(fftshift(fft(transmit_period1.real))) + 1e-50)))
 plt.xlim([0, 300])
 plt.ylim([0, 100])
 plt.grid(ls=':')
 plt.xlabel('Frequency MHz')
 
 # %% write text file
-output = 'pmcw_waveform.txt'
+output = 'pmcw_waveform_code2.txt'
 if save_code:
     import os
     if os.path.exists(output):
@@ -87,14 +91,14 @@ if save_code:
         if ans.lower() == 'y':
             os.remove(output)
 
-            generator = open(output, 'w+')
-            for i in tqdm(range(transmit_period.size)):
-                generator.write(str(transmit_period.real[i]))
-                generator.write(', 0, 0\n')
-            generator.close()
-
         else:
             print('The code is not saved!')
+    else:
+        generator = open(output, 'w+')
+        for i in tqdm(range(transmit_period2.size)):
+            generator.write(str(transmit_period2.real[i]))
+            generator.write(', 0, 0\n')
+        generator.close()
 
 
 

@@ -19,12 +19,18 @@ from numpy import pi, exp, log10
 from numpy.fft import fft, fftshift, ifftshift, ifft
 from scipy.signal import convolve
 
-from DataReform import data_reform
+from PyMat.DataReform import data_reform
 
 # %% Pre-Setting
 save_fig = False
 CMAP = 'jet'
 window_func = 'hann'
+matched = False
+
+if matched:
+    match_code = 'pmcw_waveform.txt'
+else:
+    match_code = 'pmcw_waveform_code2.txt'
 
 
 # %% System paras
@@ -78,7 +84,7 @@ plt.figure()
 plt.plot(f, np.real(recei_rec[:, 16]))
 
 # %% matched code
-wave = np.loadtxt('pmcw_waveform.txt', delimiter=',')[0::3, 0]
+wave = np.loadtxt(match_code, delimiter=',')[0::3, 0]
 wave_fft = fftshift(fft(wave[0:effective_length]*demix_wave, axis=0), axes=0)
 wave_fft[0:zeroing_length] = 0
 wave_fft[3*zeroing_length::] = 0

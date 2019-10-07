@@ -33,11 +33,8 @@ def data_reform(file,
     # %% Load file
     with open(file, 'rb') as fid:
         info = np.fromfile(fid, count=2, dtype=np.int32)
-
         print(info[0])
-
         block_to_skip = 1
-        # n_block_to_process = 65
 
         if block_to_skip >0:
             for i in range(block_to_skip):
@@ -62,38 +59,30 @@ def data_reform(file,
 
     starting_point = 200962
     slowtime_length = 399998
-
     slowtime = n_block_to_process//2
+    end_point = starting_point + slowtime_length * slowtime
 
     if filter:
-        print("Filter starts ...")
-        data_fft = fftshift(fft(recei))
-        demix_wave = exp(-2j * pi * CENTRE_FREQUENCY * np.arange(recei.size) / SAMPLING_FREQUENCY)
-        data_shift_fft = fftshift(fft(recei*demix_wave))
-        zeroing_length = recei.size//8
-        data_filtered = data_shift_fft.copy()
-        data_filtered[0:3*zeroing_length] = 0
-        data_filtered[5*zeroing_length::] = 0
+        recei = _filtering(recei, verbose)
+        trans = _filtering(trans, verbose)
 
-        if verbose:
-            fig, axs = plt.subplots(3, 1, sharex=True, sharey=True)
-            axs[0].plot(20*log10(abs(data_fft) + 1e-20))
-            axs[0].set_title("Original spectrum")
-            axs[1].plot(20*log10(abs(data_shift_fft) + 1e-20))
-            axs[1].set_title("Shifted spectrum")
-            axs[2].plot(20*log10(abs(data_filtered) + 1e-20))
-            axs[2].set_title("Filtered spectrum")
-
-        recei = ifft(ifftshift(data_filtered))
-        print("Filter finished!")
-
-    end_point = starting_point + slowtime_length * slowtime
     data = recei[starting_point:end_point].reshape([slowtime, slowtime_length]).T
     tdata = trans[starting_point:end_point].reshape([slowtime, slowtime_length]).T
 
+    # # Filter after data removing zeros
+    # EFFECTIVE_LENGTH = 262150
+    # data = data[0:EFFECTIVE_LENGTH, :].T.reshape((EFFECTIVE_LENGTH*slowtime, ))
+    # tdata = tdata[0:EFFECTIVE_LENGTH, :].T.reshape((EFFECTIVE_LENGTH*slowtime, ))
+    # if filter:
+    #     data = _filtering(data, verbose)
+    #     tdata = _filtering(tdata, verbose)
+    # data = data.reshape([slowtime, EFFECTIVE_LENGTH]).T
+    # tdata = tdata.reshape([slowtime, EFFECTIVE_LENGTH]).T
+
+
     if verbose:
         plt.figure()
-        plt.imshow(tdata, aspect='auto', cmap=CMAP)
+        plt.imshow(tdata.real, aspect='auto', cmap=CMAP)
         plt.colorbar()
     print("Data are read!")
     # %% Save file for further process
@@ -103,6 +92,29 @@ def data_reform(file,
         print('Data are saved as: '.format(mat_file_name))
 
     return data, tdata
+
+
+def _filtering(data, verbose):
+    print("Filter starts ...")
+    demix_wave = exp(-2j * pi * CENTRE_FREQUENCY * np.arange(data.size) / SAMPLING_FREQUENCY)
+    data_shift_fft = fftshift(fft(data * demix_wave))
+    zeroing_length = data.size // 16
+    data_filtered = data_shift_fft.copy()
+    data_filtered[0:7 * zeroing_length] = 0
+    data_filtered[9 * zeroing_length::] = 0
+    if verbose:
+        data_fft = fftshift(fft(data))
+        fig, axs = plt.subplots(3, 1, sharex=True, sharey=True)
+        f = np.linspace(-0.5, 0.5, data_fft.size, endpoint=False) * SAMPLING_FREQUENCY
+        axs[0].plot(f, 20 * log10(abs(data_fft) + 1e-20))
+        axs[0].set_title("Original spectrum")
+        axs[1].plot(f, 20 * log10(abs(data_shift_fft) + 1e-20))
+        axs[1].set_title("Shifted spectrum")
+        axs[2].plot(f, 20 * log10(abs(data_filtered) + 1e-20))
+        axs[2].set_title("Filtered spectrum")
+    data = ifft(ifftshift(data_filtered))
+    print("Filter finished!")
+    return data
 
 
 # %% Main func

@@ -16,7 +16,7 @@ c = physconst('LightSpeed');
 
 % [filenaam,DataDir]=uigetfile('*.bin');
 % filenaam=[DataDir,filenaam];
-filenaam = '/Users/shengzhixu/Documents/ExperimentalData/pmcw/cars/HH_20190919134453.bin';
+filenaam = '/Volumes/Personal/Backup/PMCWPARSAXData/A13/VV_20191009081112.bin';
 
 % read file
 
@@ -84,7 +84,7 @@ title('ADC0, Tx')
 
 %% split into fast-time and slow-time
 starting_point = 200962; 
-slowtime_length = 399994;                       % TODO:: in real data it is around 399994.3
+slowtime_length = 399998;                       % TODO:: in real data it is around 399994.3
 slowtime = floor(N_blocks_to_process/2);
 end_point = starting_point + slowtime_length * slowtime - 1;
 received = B(starting_point:end_point);
@@ -107,8 +107,8 @@ effective_length = 400000;
 % spectra
 f = (F_sampling/MHz)*linspace(0,1,N_sample);
 W = ones(N_sample, 1);
-center_frequency = 125e6;
-dems = exp(-2j*pi*center_frequency*[0:(length(A)-1)]'/F_sampling * 1);
+intermedia_frequency = 125e6;
+dems = exp(-2j*pi*intermedia_frequency*[0:(length(A)-1)]'/F_sampling * 1);
 
 y1=fft(W.*A.*dems, max(size(A)));
 z1 = (fftshift(y1));
@@ -140,54 +140,66 @@ figure()
 plot(db(Z1))
 a = ifft(ifftshift(Z1));
 
-figure()
-plot(real(a(200962: (200962+196608))))
-
 Z2 = z2;
 Z2(1:zero_length) = 0;
 Z2(3*zero_length:end)=0;
 figure()
 plot(db(Z2))
 b = ifft(ifftshift(Z2));
+
+%%
+
 figure()
 plot(real(b(200962: (200962+196608))))
+hold on
+plot(imag(b(200962: (200962+196608))))
+title('Received Data')
 
-%% Load codes
 
-T = readtable('pmcw_waveform.txt');
-wave = T{:, 1};
-wave = wave(1:3:end);
-wave_length = size(wave);
-
-wavefft = fftshift(fft(wave.* exp(-2j*pi*center_frequency*[0:(length(wave)-1)]'/F_sampling * 1)));
-W = wavefft;
-W(1:100000) = 0;
-W(3*100000:end)=0;
-w = ifft(ifftshift(W));
 figure()
-plot(db(W))
-    
-    
-%% Circular Correlation
-starting_point = 200962; %  600956 (second starting point)
-end_point = 200962+262139;
+plot(real(a(200962: (200962+196608))))
+hold on
+plot(imag(a(200962: (200962+196608))))
+title('Transmitted Data')
 
-wave_ = w(262139:-1:1);
-wave__ = w(1:262139);
-CORRB = cconv((b(starting_point:end_point)), (wave_), 262139);
-
-CORRB_length = length(CORRB);
-
-%% Figure
-dr = c/2/F_sampling;
-x = 0:dr:dr*262138;
-
-figure
-plot(x(1:12000), db(CORRB(1:12000)))
-xlabel('Distance (m)')
-ylabel('dB')
-grid on
-
+% %% Load codes
+% 
+% T = readtable('pmcw_waveform.txt');
+% wave = T{:, 1};
+% wave = wave(1:3:end);
+% wave_length = size(wave);
+% 
+% wavefft = fftshift(fft(wave.* exp(-2j*pi*intermedia_frequency*[0:(length(wave)-1)]'/F_sampling * 1)));
+% W = wavefft;
+% W(1:100000) = 0;
+% W(3*100000:end)=0;
+% w = ifft(ifftshift(W));
+% figure()
+% plot(db(W))
+%     
+%     
+% %% Circular Correlation
+% starting_point = 200962; %  600956 (second starting point)
+% end_point = 200962+262139;
+% 
+% wave_ = w(262139:-1:1);
+% wave__ = w(1:262139);
+% CORRB = cconv((b(starting_point:end_point)), (wave_), 262139);
+% 
+% CORRB_length = length(CORRB);
+% 
+% %% Figure
+% dr = c/2/F_sampling;
+% x = 0:dr:dr*262138;
+% 
+% % figure
+% % plot(x(1:12000), db(CORRB(1:12000)))
+% % xlabel('Distance (m)')
+% % ylabel('dB')
+% % grid on
+% 
+% fogure()
+% plot(real())
 
 
 

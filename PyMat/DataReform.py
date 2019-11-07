@@ -19,7 +19,7 @@ from numpy.fft import fftshift, fft, ifft, ifftshift, fft2
 from numpy import log10, exp, pi
 from numpy.linalg import pinv
 
-from PyMat.SysParas import INTERMEDIATE_FREQUENCY, SAMPLING_FREQUENCY, PERIOD_DURATION
+from PyMat.SysParas import INTERMEDIATE_FREQUENCY, SAMPLING_FREQUENCY, PERIOD_DURATION, CMAP
 from PyMat.utils import load_matched_code, next_pow, svdinv
 
 
@@ -29,7 +29,6 @@ def data_reform(file,
                 filter=True,
                 verbose=False,
                 win_func=None,
-                hfunc=True,
                 filter_with_error = False):
 
     '''
@@ -84,23 +83,22 @@ def data_reform(file,
     # recei = recei * demix_wave
     # trans = trans * demix_wave
 
-    if hfunc:
-        print('Generated wave loading ...')
-        wave = np.loadtxt('pmcw_waveform.txt', delimiter=',')[0::3, 0]
-        W = np.tile(wave, [slowtime, 1])    # slow * fast
-        print('Generated wave loaded!')
-
     recei = recei.reshape([slowtime, slowtime_length]).T.astype('complex')
     trans = trans.reshape([slowtime, slowtime_length]).T.astype('complex')
 
     if filter:
         print("Filter starts ...")
         if filter_with_error:
+            print('Generated wave loading ...')
+            wave = np.loadtxt('pmcw_waveform.txt', delimiter=',')[0::3, 0]
+            W = np.tile(wave, [slowtime, 1])  # slow * fast
+            print('Generated wave loaded!')
+
             trans, H = filtering(trans, compensated=True, verbose=verbose, win_func=win_func, mode='trans', t_mat=W)
             recei, _ = filtering(recei, compensated=True, verbose=verbose, win_func=win_func, mode='recei', t_mat=H)
         else:
-            trans, H = filtering(trans, compensated=True, verbose=verbose, win_func=win_func, mode=None, t_mat=W)
-            recei, _ = filtering(recei, compensated=True, verbose=verbose, win_func=win_func, mode=None, t_mat=H)
+            trans, H = filtering(trans, compensated=True, verbose=verbose, win_func=win_func)
+            recei, _ = filtering(recei, compensated=True, verbose=verbose, win_func=win_func)
         print("Filter finished!")
 
     data = recei.reshape([slowtime, slowtime_length]).T.astype('complex')
@@ -140,14 +138,15 @@ def filtering(data,
     # system transmit error problem
     H = None
 
-    S, F = data.shape
+    S = data.shape
     if mode=='trans':
         print('Trans mode started ...')
-        H = (fft2(t_mat, [next_pow(S), next_pow(F)])) @ svdinv(fft2(data, [next_pow(S), next_pow(F)])).T.conj()
+        H = (fft2(t_mat, [next_pow(S[0]), next_pow(S[1])])) \
+            @ svdinv(fft2(data, [next_pow(S[0]), next_pow(S[1])])).T.conj()
         print('Trans mode finished')
     elif mode=='recei':
         print('Recei mode started ...')
-        data = ifft((fft2(data, [next_pow(S), next_pow(F)])) @ t_mat)[0:S, 0:F].flatten()
+        data = ifft((fft2(data, [next_pow(S[0]), next_pow(S[1])])) @ t_mat)[0:S[0], 0:S[1]].flatten()
         print('Recei mode finished')
     else:
         pass
@@ -168,8 +167,8 @@ def filtering(data,
     if compensated:
         demix_wave = exp(-2j * pi * fi * np.arange(data.size) / fs)
     else:
-        demix_wave = np.ones_like(data)
-    data_shift_fft = fftshift(fft(data * demix_wave))
+        demix_wave = np.ones_like(data.flatten())
+    data_shift_fft = fftshift(fft(data.T.flatten() * demix_wave))
     zeroing_length = data.size // 16
     data_filtered = data_shift_fft.copy()
 
@@ -187,7 +186,7 @@ def filtering(data,
         data_filtered = data_filtered * win
 
     if verbose:
-        data_fft = fftshift(fft(data))
+        data_fft = fftshift(fft(data.T.flatten()))
         data_fft_db_max = np.max(20 * log10(abs(data_fft)))
         fig, axs = plt.subplots(3, 1, sharex=True, sharey=True)
         f = np.linspace(-0.5, 0.5, data_fft.size, endpoint=False) * fs
@@ -211,39 +210,45 @@ def filtering(data,
 
 # %% Main func
 if __name__ == '__main__':
-    # path = '/Volumes/Personal/Backup/PMCWPARSAXData/cars/'
-    # file = 'HH_20190919134453.bin'
-    CMAP = 'jet'
+    path = '/Volumes/Personal/Backup/PMCWPARSAXData/cars/'
+    file = 'HH_20190919134453.bin'
+    PERIOD_DURATION = 1e-3
 
-    path = '/Volumes/Personal/Backup/PMCWPARSAXData/chimney/'
-    file ='HH_20190919075847.bin'
-    target = 'chimney'
+    # path = '/Volumes/Personal/Backup/PMCWPARSAXData/chimney/'
+    # file ='HH_20190919075847.bin'
+    # target = 'chimney'
 
-    path =  '/Volumes/Personal/Backup/PMCWPARSAXData/A13/'
-    channel = 'VV'
-    file = channel + '_20191009081112.bin'
-    PERIOD_DURATION = 0.5e-3
+    # path =  '/Volumes/Personal/Backup/PMCWPARSAXData/A13/'
+    # channel = 'VV'
+    # file = channel + '_20191009081112.bin'
+    # PERIOD_DURATION = 0.5e-3
 
     INTERMEDIATE_FREQUENCY = 125_000_000
-    SAMPLING_FREQUENCY = 399_996_327 + 230 + 50 + 41 + 20 + 21 + 30 + 12
-    SAMPLING_FREQUENCY = 400e6
+    SAMPLING_FREQUENCY = 399_996_327 # + 230 + 50 + 41 + 20 + 21 + 30 + 12
+    # SAMPLING_FREQUENCY = 400e6
 
     data, tdata = data_reform(path + file,
                               verbose=True,
                               filter=True,
-                              n_block_to_process=3,
+                              n_block_to_process=33,
                               win_func='rect',
-                              filter_with_error=True)
+                              filter_with_error=False)
 
-    plt.figure()
+    plt.figure(figsize=[12,3])
     # plt.plot(data.T.flatten().imag, label='imaginary part')
     plt.plot(tdata.T.flatten().real[::1], label='real part')
+    plt.xlabel('sampling index')
+    plt.ylabel('amplitude')
+    plt.title('Trans Sig (recorded)')
+    plt.ylim([-450, 450])
     plt.legend(loc=1)
+    plt.savefig('trans_sig_recorded.png', dpi=300)
+
 
 
     f = np.linspace(-1/2/PERIOD_DURATION, 1/2/PERIOD_DURATION, 128, endpoint=False)
     plt.figure()
-    plt.imshow(abs((fft(tdata[0:4000:8, :], n=128, axis=-1))),
+    plt.imshow(abs((fft(data[0:4000:8, :], n=128, axis=-1))),
                aspect='auto',
                cmap=CMAP,
                extent=[f[0], f[-1], 0, 200]

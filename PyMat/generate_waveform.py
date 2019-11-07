@@ -72,8 +72,14 @@ transmit_period2[0:code2_tc.size] = center_wave * code2_tc
 # %%
 plt.figure()
 plt.plot(code1_tc)
-plt.figure()
+
+plt.figure(figsize=[10, 4])
 plt.plot(transmit_period1.real)
+plt.xlabel('fast time index')
+plt.ylabel('amplitude')
+plt.title('Generated codes')
+plt.savefig('generated_codes.png', dpi=300)
+
 
 plt.figure()
 plt.plot(np.linspace(-600, 600, transmit_period1.size, endpoint=False),

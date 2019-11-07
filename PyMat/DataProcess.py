@@ -21,7 +21,7 @@ from scipy.signal import convolve
 
 from PyMat.DataReform import data_reform
 from PyMat.SysParas import *
-from PyMat.utils import load_matched_code
+from PyMat.utils import load_matched_code, next_pow, conv_fft, deconv_fft
 
 
 # %% fast-time correlation
@@ -41,9 +41,22 @@ def fast_time_correlation(data, matched_code, downsampling_rate=1, conv_mode='sa
             range_data[:, i] = convolve(data_downsampling[:, i], matched_code_downsampling, mode=conv_mode)
         else:
             matched_code_downsampling = matched_code[::-downsampling_rate, ...].conj()
-            range_data[:, i] = convolve(data_downsampling[:, i], matched_code_downsampling[:, i], mode=conv_mode)
-
+            # range_data[:, i] = convolve(data_downsampling[:, i], matched_code_downsampling[:, i], mode=conv_mode)
+            range_data[:, i] = conv_fft(data_downsampling[:, i], matched_code_downsampling[:, i], mode=conv_mode)[0:range_data.shape[0]]
     print("Fast-time correlation finished!")
+
+    return range_data
+
+
+def fast_time_decorrelation(data, matched_code):
+
+    print("\nFast-time decorrelation started ...")
+    match_code = matched_code[::-1].conj()
+    range_data = np.zeros((EFFECTIVE_LENGTH, data.shape[1]), dtype='complex')
+    for i in tqdm(range(data.shape[1])):
+        range_data[:, i] = deconv_fft(data[:, i], match_code)[0:EFFECTIVE_LENGTH]
+
+    print("\nFast-time decorrelation finished!")
 
     return range_data
 
@@ -145,22 +158,24 @@ if __name__ == '__main__':
     path =  '/Volumes/Personal/Backup/PMCWPARSAXData/cars/'
     file ='HH_20190919134453.bin'
     target = 'cars'
+    PERIOD_DURATION = 1e-3
 
     # path = '/Volumes/Personal/Backup/PMCWPARSAXData/chimney/'
     # file ='HH_20190919075858.bin'
     # target = 'chimney'
 
-    path =  '/Volumes/Personal/Backup/PMCWPARSAXData/A13/'
-    file = 'VV_20191009081112.bin'
-    target = 'vehicles'
-    PERIOD_DURATION = 0.5e-3
+    # path =  '/Volumes/Personal/Backup/PMCWPARSAXData/A13/'
+    # file = 'VV_20191009081112.bin'
+    # target = 'vehicles'
+    # PERIOD_DURATION = 0.5e-3
 
-    N_Block = 141
+    N_Block = 101
     recei, trans = data_reform(path + file,
                                n_block_to_process=N_Block,
                                verbose=False,
                                filter=True,
-                               win_func='rect')
+                               win_func='rect',
+                               filter_with_error=False)
 
     fast_time, slow_time = recei.shape
     global EFFECTIVE_LENGTH
@@ -169,65 +184,60 @@ if __name__ == '__main__':
     trans_mat = trans[0:EFFECTIVE_LENGTH, :]
     del recei, trans
 
-    # %% range doppler process
+    # %% pre-setting
     matched_code = load_matched_code(code_file=match_code, verbose=False)
-    # matched_code = trans_mat
-    # shifted = False
     fft_zoom = 1
     downsampling_rate = 1
+    range_domain = [1500, 3500]
 
-    # Conventional Process
-    range_data1 = fast_time_correlation(recei_rec,
+    # %% Conventional process
+    # fast - slow
+    range_data3 = fast_time_correlation(recei_rec,
                                         matched_code=trans_mat,
                                         downsampling_rate=downsampling_rate,
                                         conv_mode='same')
-    doppler_data1 = slow_time_fft(range_data1,
-                                  win_func=win_func,
-                                  shifted=True,
-                                  fft_zoom=fft_zoom)
 
-    range_domain = [1500, 15500]
-    range_doppler_show(doppler_data1,
+    doppler_data3 = slow_time_fft(range_data3,
+                                  win_func=None,
+                                  fft_zoom=fft_zoom,
+                                  shifted=True)
+
+    range_doppler_show(doppler_data3,
                        start_plot=range_domain[0],
                        end_plot=range_domain[1],
                        normalize=False,
                        clim=60,
-                       title="{}_range_doppler".format(target),
+                       title="{}_range_doppler_fs2".format(target),
                        save_fig=save_fig,
                        downsampling_rate=downsampling_rate
                        )
 
-    # %% Doppler compensation
-    # doppler_data2 = slow_time_fft(recei_rec,
-    #                               win_func=win_func,
-    #                               fft_zoom=fft_zoom,
-    #                               shifted=False)
-    # compensation_data2 = doppler_compensation(doppler_data2,
-    #                                           downsampling_rate=downsampling_rate)
-    # matched_code = slow_time_fft(trans_mat,
-    #                              win_func=win_func,
-    #                              fft_zoom=fft_zoom,
-    #                              shifted=False)
-    #
-    # range_data2 = fast_time_correlation(compensation_data2,
-    #                                     matched_code=matched_code,
-    #                                     downsampling_rate=downsampling_rate)
-    #
-    # range_doppler_show(range_data2,
-    #                    start_plot=range_domain[0],
-    #                    end_plot=range_domain[1],
-    #                    normalize=False,
-    #                    clim=60,
-    #                    title="{}_range_doppler_compensation".format(target),
-    #                    save_fig=save_fig,
-    #                    downsampling_rate=downsampling_rate
-    #                    )
+    #  slow fast
+    doppler_data4 = slow_time_fft(recei_rec,
+                                  win_func=None,
+                                  fft_zoom=fft_zoom,
+                                  shifted=False)
+
+    range_data4 = fast_time_correlation(doppler_data4,
+                                        matched_code=trans_mat,
+                                        downsampling_rate=downsampling_rate,
+                                        conv_mode='same')
+
+    range_doppler_show(range_data4,
+                       start_plot=range_domain[0],
+                       end_plot=range_domain[1],
+                       normalize=False,
+                       clim=60,
+                       title="{}_range_doppler_sf2".format(target),
+                       save_fig=save_fig,
+                       downsampling_rate=downsampling_rate
+                       )
 
     # %%
-    # range_doppler_show(20*log10(abs(doppler_data1) + 1e-20)-20*log10(abs(range_data2) + 1e-20),
-    #                    start_plot=range_domain[0],
-    #                    end_plot=range_domain[1],
-    #                    dB=False,
-    #                    normalize=False,
-    #                    clim=90)
+    range_doppler_show(20*log10(abs(doppler_data4) + 1e-20)+ 1e-20,
+                       start_plot=range_domain[0],
+                       end_plot=range_domain[1],
+                       dB=False,
+                       normalize=False,
+                       clim=90)
     plt.show()

@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 from numpy import exp, pi, log2
 from numpy.fft import fft, fftshift, ifftshift, ifft
 from scipy import signal
+from scipy import convolve
 
 from PyMat.SysParas import *
 
@@ -61,5 +62,45 @@ def svdinv(R):
     return U @ np.diag(1/A) @ V
 
 
+def conv_fft(x, h, mode='same'):
+    M = np.max([x.size, h.size])
+    K = np.min([x.size, h.size])
+    N = next_pow(M)
+    X = fft(x, N)
+    H = fft(h, N)
+    Y = X*H
+    y = ifft(Y)
+
+    if K % 2 == 1:
+        starting_point = (K) // 2
+    else:
+        starting_point = (K-1) // 2
+    if mode == 'same':
+        return y[starting_point:starting_point+M]
+    else:
+        return y
+
+
+def deconv_fft(y, h):
+    N = next_pow(np.max([y.size, h.size]))
+    Y = fft(y, N)
+    H = fft(h, N)
+    X = Y/H
+    x = ifft(X)
+
+    # _size = np.sum(abs(x) >= 1e-8)
+    return x
+
 if __name__ == '__main__':
-    pass
+    a = np.random.randint(0, 10, size=np.random.randint(2, 15))
+    b = np.random.randint(0, 10, size=np.random.randint(2, 15))
+    # a = np.array([6, 6, 4, 6, 9, 8, 7])
+    # b = np.array([4, 9, 0, 9, 7, 8])
+
+    print("convolve(a, b): {}".format(convolve(a, b, 'same')))
+    print("conv_fft(a, b): {}".format(conv_fft(a, b, 'same').real))
+
+    c = conv_fft(a, b, 'full')
+    d = deconv_fft(c, b)
+    print('a: {}'.format(a))
+    print('d: {}'.format(d.real[0:a.size]))

@@ -14,49 +14,29 @@ import matplotlib.pyplot as plt
 
 from scipy.signal import convolve, deconvolve
 from numpy.fft import fft, fftshift, ifft
-from PyMat.utils import next_pow
 
 
-x = np.array([1, 2, 3, 4, 2, 1, 10])
-h = np.array([1, 1, 1, 1, 1, 1, 2, 2, 3, 4])
-# x = np.random.randn(100)
-# h = np.random.randn(100)
+a = np.random.randn(5) + 1j *np.random.randn(5)
+b = np.random.randn(5) + 1j *np.random.randn(5)
 
-def _conv_fft(x, h, mode='same'):
-    N = next_pow(np.max([x.size, h.size]))
-    X = fft(x, N)
-    H = fft(h, N)
-    Y = X*H
-    y = ifft(Y)
+c = convolve(a, b[::-1].conj(), mode='same')
+cc = convolve(a[::-1], b.conj(), mode='same')
 
+d = convolve(a.conj(), b[::-1], mode='same')
+e = convolve(b, a[::-1].conj(), mode='same')
+f = convolve(b.conj(), a[::-1], mode='same')
+g = convolve(a[::-1], b.conj(), mode='same')
 
-    if mode == 'same':
-        if h.size % 2 == 1:
-            starting_point = h.size // 2
-        else:
-            starting_point = h.size // 2 - 1
-        return y[starting_point:starting_point+x.size]
-    else:
-        return y
+print('c', c)
+print('cc', cc)
+print('d', d)
+print('e', e)
+print('f', f)
+print('g', g)
 
+# c = np.correlate(a, b, mode='valid')
+# d = np.correlate(b, a, mode='valid')
+# print('c', c)
+# print('d', d)
 
-def _deconv_fft(y, h):
-    N = next_pow(np.max([y.size, h.size]))
-    Y = fft(y, N)
-    H = fft(h, N)
-    X = Y/H
-    x = ifft(X)
-
-    _size = np.sum(abs(x) >= 1e-8)
-    return x[0:_size]
-
-
-y = convolve(x, h, 'same')
-print('y', y)
-
-yy = _conv_fft(x, h, mode=None)
-print('yy', yy.real)
-
-xx = _deconv_fft(yy, h)
-print(xx.real)
 

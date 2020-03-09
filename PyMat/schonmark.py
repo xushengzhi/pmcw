@@ -6,6 +6,8 @@ Create on 2020/3/3
 @email:sz.xu@hotmial.com
 '''
 
+import time
+
 import numpy as np
 import scipy as sp
 import matplotlib.pyplot as plt
@@ -67,6 +69,7 @@ velocity_domain = np.linspace(-vm, vm, recei.shape[1]*fft_zoom, endpoint=False)
 # %%
 
 # fs
+tic = time.time()
 range_data = fast_time_correlation(recei[0:EFFECTIVE_LENGTH, :],
                                    matched_code = matched_code,
                                    conv_mode='same')
@@ -84,6 +87,8 @@ compensation_data = doppler_compensation(doppler_data2, pri=PERIOD_DURATION)
 range_data2 = fast_time_correlation(compensation_data,
                                    matched_code=matched_code,
                                    conv_mode='same')
+toc = time.time()
+print("Processing time: {:.3} seconds".format(toc - tic))
 # %%
 plt.figure()
 plt.imshow(dB(doppler_data[EFFECTIVE_LENGTH//2::, :]))
@@ -103,7 +108,7 @@ plt.ylabel('Range (km)')
 plt.colorbar()
 plt.clim([20, 60])
 if save_fig:
-    plt.savefig('fs_air.png', dpi=300)
+    plt.savefig('fs_vehicle.png', dpi=300)
 
 plt.figure()
 plt.imshow(dB(range_data2[EFFECTIVE_LENGTH//2+range_axis[0]:EFFECTIVE_LENGTH//2+range_axis[1], :]),
@@ -115,7 +120,7 @@ plt.ylabel('Range (km)')
 plt.colorbar()
 plt.clim([20, 60])
 if save_fig:
-    plt.savefig('sf_air.png', dpi=300)
+    plt.savefig('sf_vehicle.png', dpi=300)
 
 
 # velocity_slice = 419 # 954//2

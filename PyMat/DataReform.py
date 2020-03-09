@@ -19,7 +19,7 @@ from numpy.fft import fftshift, fft, ifft, ifftshift, fft2
 from numpy import log10, exp, pi
 from numpy.linalg import pinv
 
-from SysParas import INTERMEDIATE_FREQUENCY, SAMPLING_FREQUENCY, PERIOD_DURATION, CMAP
+from SysParas import INTERMEDIATE_FREQUENCY, SAMPLING_FREQUENCY, CMAP
 from utils import load_matched_code, next_pow, svdinv
 
 
@@ -27,8 +27,12 @@ def data_reform(file,
                 save_data=False,
                 n_block_to_process=65,
                 filter=True,
+                compensation=True,
                 verbose=False,
-                win_func=None):
+                win_func=None,
+                fi=INTERMEDIATE_FREQUENCY,
+                pri=1e-3,
+                **kwargs):
 
     '''
     Reform the original data
@@ -63,25 +67,31 @@ def data_reform(file,
     trans = B[:, 0]
     recei = B[:, 1]
 
-    # plt.figure()
-    # plt.plot(recei.real)
-
-    starting_point = 203064           #200962     # 202796
-    slowtime_length = (400000 - 2)//int(1e-3/PERIOD_DURATION)
-    slowtime = int(n_block_to_process // (2/int(1e-3/PERIOD_DURATION)) - 1*(PERIOD_DURATION<1e-3))
-    end_point = starting_point + slowtime_length * slowtime
-
-    trans = trans[starting_point:end_point]
-    recei = recei[starting_point:end_point]
-    trans[trans>5000] = 0
-
     if verbose:
         plt.figure()
-        plt.plot(trans)
-        plt.title("Transmitted Signals (only real)")
+        plt.plot(trans.real)
 
-    recei = recei.reshape([slowtime, slowtime_length]).T.astype('complex')
-    trans = trans.reshape([slowtime, slowtime_length]).T.astype('complex')
+    start_point = 262268  # 203035           #200962     # 202796   #203064
+    if pri < 1e-3:
+        fasttime = (400000 - 2)//int(1e-3/pri)
+        slowtime = int((n_block_to_process-1) // (2/int(1e-3/pri)) - 1*(pri<1e-3))
+    else:
+        fasttime = 524290
+        slowtime = int((n_block_to_process * 400_000 - start_point)/fasttime/2) - 1
+    end_point = start_point + fasttime * slowtime
+
+    trans = trans[start_point:end_point]
+    recei = recei[start_point:end_point]
+    trans[trans>5000] = 0
+
+    # if verbose:
+    #     plt.figure()
+    #     plt.plot(trans)
+    #     plt.title("Transmitted Signals (only real)")
+
+    recei = recei.reshape([slowtime, fasttime]).T.astype('complex')
+    trans = trans.reshape([slowtime, fasttime]).T.astype('complex')
+
 
     if verbose:
         plt.figure()
@@ -90,47 +100,69 @@ def data_reform(file,
         plt.title('Before Alignment')
         plt.xlabel('Slow-time index')
         plt.ylabel('Samples')
-    trans[:, ::2]  = np.roll(trans[:, ::2], -1, axis=0)
-    recei[:, ::2]  = np.roll(recei[:, ::2], -1, axis=0)
 
-    for i in range(slowtime//2):
-        if i==2:
-            length_shift = 1750  #1923 * (i-1)
-            trans[0:length_shift, i * 2] = np.roll(trans[0:length_shift, i * 2], 2, axis=0)
-            recei[0:length_shift, i * 2] = np.roll(recei[0:length_shift, i * 2], 2, axis=0)
-        elif i>2:
-            length_shift = 1750 + 1923 * (i-2)
-            trans[0:length_shift, i * 2] = np.roll(trans[0:length_shift, i * 2], 2, axis=0)
-            recei[0:length_shift, i * 2] = np.roll(recei[0:length_shift, i * 2], 2, axis=0)
-        else:
-            pass
+    ##############################################################
+    ################# # data alignment manually for aircraft
+    # for i in range(slowtime):
+    #     trans[:, i] = np.roll(trans[:, i], -2*(i//10))
+    #     recei[:, i] = np.roll(recei[:, i], -2*(i//10))
+    #     if i//10 >= 2 and i%10==0:
+    #         k = i//10
+    #         noll_length = 1785 + (k-2)*1930
+    #         if noll_length > fasttime:
+    #             noll_length = fasttime
+    #         trans[0:noll_length, i] = np.roll(trans[0:noll_length, i], 2)
+    #         recei[0:noll_length, i] = np.roll(recei[0:noll_length, i], 2)
 
-    # Ntrans = trans.copy()
-    # Ntrans[:, ::2] = np.roll(trans[:, ::2], -2, axis=0)
-    # plt.figure()
-    # plt.imshow((abs(Ntrans.real)), aspect='auto')
-    # if verbose:
-    #     plt.figure()
-    #     plt.imshow((abs(Ntrans.real)), aspect='auto')
+    ################  # data_alignment manually for highway data
+    # trans[:, ::2]  = np.roll(trans[:, ::2], -1, axis=0)
+    # recei[:, ::2]  = np.roll(recei[:, ::2], -1, axis=0)
+    #
+    # for i in range(slowtime//2):
+    #     if i==2:
+    #         length_shift = 1750  #1923 * (i-1)
+    #         trans[0:length_shift, i * 2] = np.roll(trans[0:length_shift, i * 2], 2, axis=0)
+    #         recei[0:length_shift, i * 2] = np.roll(recei[0:length_shift, i * 2], 2, axis=0)
+    #     elif i>2:
+    #         length_shift = 1750 + 1923 * (i-2)
+    #         trans[0:length_shift, i * 2] = np.roll(trans[0:length_shift, i * 2], 2, axis=0)
+    #         recei[0:length_shift, i * 2] = np.roll(recei[0:length_shift, i * 2], 2, axis=0)
+    #     else:
+    #         pass
+
+    ###############   # data alignment manually for schonmark data
+
+
+
+
+
+
+    ##############################################################
+
+    if verbose:
+        plt.figure()
+        plt.imshow(trans.real, aspect='auto', cmap=CMAP)
+        plt.colorbar()
+        plt.title('After Alignment trans')
+        plt.figure()
+        plt.imshow(recei.real, aspect='auto', cmap=CMAP)
+        plt.colorbar()
+        plt.title('After Alignment recei')
 
     if filter:
         print("Filter starts ...")
 
-        trans = filtering(trans, compensated=True, verbose=verbose, win_func=win_func)
-        recei = filtering(recei, compensated=True, verbose=verbose, win_func=win_func)
+        trans = filtering(trans, compensated=compensation, verbose=False, win_func=win_func, fi=fi, **kwargs)
+        recei = filtering(recei, compensated=compensation, verbose=False, win_func=win_func, fi=fi, **kwargs)
         print("Filter finished!")
 
-        data = recei.reshape([slowtime, slowtime_length]).T.astype('complex')
-        tdata = trans.reshape([slowtime, slowtime_length]).T.astype('complex')
+        data = recei.reshape([slowtime, fasttime]).T.astype('complex')
+        tdata = trans.reshape([slowtime, fasttime]).T.astype('complex')
     else:
         data = recei
         tdata = trans
 
-    if verbose:
-        plt.figure()
-        plt.imshow(tdata.real, aspect='auto', cmap=CMAP)
-        plt.colorbar()
-        plt.title('After Alignment')
+
     print("Data are read!")
 
     # % Save file for further process
@@ -147,7 +179,9 @@ def filtering(data,
                verbose=False,
                win_func=None,
                fs=SAMPLING_FREQUENCY,
-               fi=INTERMEDIATE_FREQUENCY):
+               fi=INTERMEDIATE_FREQUENCY,
+               fisrt_sidelobe_include=False,
+               **kwargs):
     # system transmit error problem
 
     # compensation
@@ -165,8 +199,14 @@ def filtering(data,
         pass
     elif win_func is 'rect':
         print("The Rectangular windowing function is applied for slow time")
-        data_filtered[0:6 * zeroing_length] = 0
-        data_filtered[10 * zeroing_length::] = 0
+        if fisrt_sidelobe_include:
+            print('First sidelobe included!')
+            data_filtered[0:6 * zeroing_length] = 0
+            data_filtered[10 * zeroing_length::] = 0
+        else:
+            print('First sidelobe excluded!')
+            data_filtered[0:7 * zeroing_length] = 0
+            data_filtered[9 * zeroing_length::] = 0
     else:
         win_func = eval('signal.windows.' + win_func)
         print("The windowing function {} is applied for slow time".format(win_func.__name__))
@@ -207,7 +247,7 @@ if __name__ == '__main__':
     path = '/Volumes/Personal/ExternalDrive/Backup/PMCWPARSAXData/sync_clock_data_a13/'
     file = 'VV/VV_20191126093852.bin'
     # file = 'VV/VV_20191126093725.bin'
-    PERIOD_DURATION = 1e-3/2
+    pri = 1e-3/2
     save_fig = False
 
     # path = '/Volumes/Personal/Backup/PMCWPARSAXData/chimney/'
@@ -217,7 +257,7 @@ if __name__ == '__main__':
     # path =  '/Volumes/Personal/Backup/PMCWPARSAXData/A13/'
     # channel = 'VV'
     # file = channel + '_20191009081112.bin'
-    # PERIOD_DURATION = 0.5e-3
+    # pri = 0.5e-3
 
     INTERMEDIATE_FREQUENCY = 125_000_000
     SAMPLING_FREQUENCY = 399_996_327 # + 230 + 50 + 41 + 20 + 21 + 30 + 12
@@ -238,7 +278,7 @@ if __name__ == '__main__':
     # # plt.ylim([-450, 450])
     # plt.legend(loc=1)
     # if save_fig:
-    #     plt.savefig('trans_sig_recorded_{}ms.png'.format(str(PERIOD_DURATION*1e3)), dpi=300)
+    #     plt.savefig('trans_sig_recorded_{}ms.png'.format(str(pri*1e3)), dpi=300)
 
     # %%
     plt.figure(figsize=[15, 3])
@@ -256,10 +296,10 @@ if __name__ == '__main__':
     plt.hlines(125, 131072, 200095, colors='r', linestyles=':', lw=2)
     plt.text(142100, 100, 'nulls')
     if save_fig:
-        plt.savefig('recei_sig_recorded_{}ms.png'.format(str(PERIOD_DURATION*1e3)), dpi=300)
+        plt.savefig('recei_sig_recorded_{}ms.png'.format(str(pri*1e3)), dpi=300)
 
 
-    # f = np.linspace(-1/2/PERIOD_DURATION, 1/2/PERIOD_DURATION, 128, endpoint=False)
+    # f = np.linspace(-1/2/pri, 1/2/pri, 128, endpoint=False)
     # plt.figure()
     # plt.imshow(abs(fftshift(fft(tdata[10000:12000, :], n=128, axis=-1))),
     #            aspect='auto',
@@ -267,4 +307,4 @@ if __name__ == '__main__':
     #            extent=[f[0], f[-1], 0, 200]
     #            )
     # if save_fig:
-    #     plt.savefig('Doppler {}ms.png'.format(str(PERIOD_DURATION*1e3)), dpi=300)
+    #     plt.savefig('Doppler {}ms.png'.format(str(pri*1e3)), dpi=300)

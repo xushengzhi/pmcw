@@ -24,7 +24,7 @@ def welch_bound(codes):
     s, l = codes.shape
     return np.sqrt((s - 1) * l**2 / (s*l -1))
 
-codes = loadmat('code8192.mat')['codes']
+codes = loadmat('data/code8192.mat')['codes']
 code1 = codes[0, :]
 
 # # np.random.shuffle(code1)

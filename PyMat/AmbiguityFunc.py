@@ -22,7 +22,7 @@ from tqdm import tqdm
 def ambiguity_function(data, f_vec, fs,
                        normalize=True, mode='zero-padding', *args, **kwargs):
     '''
-    Narrowband Ambiguity Function
+    Narrowband Ambiguity Function: using matrix product (for small waveform samples)
     :param data: 1D numpy array, vectorized time sampled data
     :param tau_vec: time delay vector
     :param f_vec: Doppler frequency vector
@@ -69,6 +69,18 @@ def ambiguity_function(data, f_vec, fs,
 
 def ambiguity_function2(data, f_vec, fs,
                        normalize=True, mode='zero-padding', *args, **kwargs):
+    '''
+        Narrowband Ambiguity Function: using loop (for large waveform samples)
+    :param data:
+    :param f_vec:
+    :param fs:
+    :param normalize:
+    :param mode:
+    :param args:
+    :param kwargs:
+    :return:
+    '''
+
     if normalize:
         data = data/np.sqrt(abs(np.sum(data * data.conj())))    # normalize
     M = len(data)                                           # time index

@@ -23,13 +23,25 @@ from SysParas import BANDWIDTH, CARRIER_FREQUENCY, INTERMEDIATE_FREQUENCY, SAMPL
 mpl.rcParams['agg.path.chunksize'] = 10000
 
 
-save_code = False
+save_code = 0
+matched = 1
+zero_padding = False
+
 save_fig = False
+
 # %% Load Code
 # load mutual orthogonal codes series code1 and code2
-code = loadmat('code4096.mat')['codes']
+code_length = 2048 * 16         # aircraft 2048 automotive 8192
+BANDWIDTH = 50e6            # aircraft 48e6 automotive 50e6
+PRI = 20e-4                  # aircraft 2e-4 automotive 5~10 e-4
+
+Tc = 2/BANDWIDTH
+code = loadmat('data/code{}.mat'.format(code_length))['codes']
 code1 = code[0, :]
 code2 = code[1, :]
+# code1[-1000::] = 0
+# code1[-300::] = 0
+
 code_length = code.shape[1]
 print('The code length is {}'.format(code_length))
 del code
@@ -38,8 +50,6 @@ del code
 # radar parameters setting, the sampling frequency of the waveform generator
 sampling_frequency = SAMPLING_FREQUENCY                  # Waveform Generator Sampling Frequency
 sampling_interval = 1/sampling_frequency
-Tc = 2/BANDWIDTH
-PRI = 2e-4
 
 # Reset parameters
 duration_grid1 = int(np.floor(sampling_frequency*PRI / code_length))     # maximum number of samples for one bchip
@@ -52,19 +62,23 @@ print('Smaples for each Bcode: {:>8}'.format(duration_grid))
 T = Tc * code_length                                                     # 0.65 ms
 print('bcode duration time: {:>11.6f}'.format(T))
 
-vm = c/4/CARRIER_FREQUENCY/PRI
-Rm = c*T/2
-dR = c/2/BANDWIDTH
-print('vm: {:>28.3f}\nRm: {:>28.3f}\ndR: {:>28.3f}'.format(vm, Rm, dR))
+
 
 # %% Generate code
 samples_for_code = code_length * duration_grid
-samples_per_pri = int(sampling_frequency * PRI)
-samples_zeros = samples_per_pri - samples_for_code
+if zero_padding:
+    samples_per_pri = int(sampling_frequency * PRI)
+    samples_zeros = samples_per_pri - samples_for_code
+else:
+    samples_per_pri = samples_for_code
+    samples_zeros = 0
+    PRI = Tc * code_length
 time_zeros = samples_zeros * sampling_interval
 
-code1_rep = np.repeat(code1, duration_grid)
-code2_rep = np.repeat(code2, duration_grid)
+# code1_rep = np.repeat(code1, duration_grid)
+# code2_rep = np.repeat(code2, duration_grid)
+code1_rep = np.kron(code1, np.ones(duration_grid,))
+code2_rep = np.kron(code2, np.ones(duration_grid,))
 
 trans_code1 = np.zeros(samples_per_pri, )
 trans_code2 = np.zeros(samples_per_pri, )
@@ -90,7 +104,7 @@ if save_fig:
     plt.savefig('generated_bcodes.png', dpi=300)
 
 plt.figure(figsize=[10, 3])
-plt.plot(transmit_period1.real[0:200])
+plt.plot(transmit_period1.real)
 plt.xlabel('fast time index')
 plt.ylabel('amplitude')
 plt.title('phase-coded waves')
@@ -115,14 +129,31 @@ if save_fig:
 
 print(transmit_period1.size)
 
+
+vm = c/4/CARRIER_FREQUENCY/PRI
+Rm = c*T/2
+dR = c/2/BANDWIDTH
+print('vm (m/s): {:>22.3f}\nvm (km/h): {:>21.3f}\nRm: {:>28.3f}\ndR: {:>28.3f}'.format(vm, vm*3.6, Rm, dR))
+
 # %% write text file
-output = 'pmcw_4096_code.txt'
+if matched:
+    output = 'data/pmcw_{}_zeropad_{}2.txt'.format(code_length, zero_padding)
+    saved_data_name = transmit_period1
+else:
+    output = 'data/pmcw_{}_mismatch_zeropad_{}.txt'.format(code_length, zero_padding)
+    saved_data_name = transmit_period2
+
+
 def _save_code(output, file):
     generator = open(output, 'w+')
     for i in tqdm(range(file.size)):
         generator.write(str(file.real[i]))
-        generator.write(', 0, 0\n')
+        if i == file.size-1:
+            generator.write(', 0, 0')
+        else:
+            generator.write(', 0, 0\n')
     generator.close()
+
 
 if save_code:
     import os
@@ -131,12 +162,12 @@ if save_code:
 
         if ans.lower() == 'y':
             os.remove(output)
-            _save_code(output, transmit_period1)
+            _save_code(output, saved_data_name)
 
         else:
             print('The code is not saved!')
     else:
-        _save_code(output, transmit_period1)
+        _save_code(output, saved_data_name)
 
 
 

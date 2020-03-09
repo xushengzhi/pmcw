@@ -11,14 +11,14 @@ import scipy as sp
 import matplotlib.pyplot as plt
 import matplotlib
 from scipy.io import loadmat
-from numpy import exp, pi, sin
+from numpy import exp, pi, sin, sqrt, cos
 from scipy.signal import correlate, convolve
 
 from utils import dB, random_code, conv_circ
 # matplotlib.rcParams['text.usetex'] = True
 
 
-save_fig = True
+save_fig = 0
 # %%
 def peak_energy_loss(code, frequency=None):
     if frequency is None:
@@ -52,11 +52,11 @@ def peak_energy_loss(code, frequency=None):
 frequency = np.linspace(0, 0.5, 11, endpoint=True)
 # frequency = [0.2372]
 # ZCZ codes 4096
-zcz = loadmat('code2048.mat')['codes'][0, :]
+zcz = loadmat('data/code2048.mat')['codes'][0, :]
 zcz_loss, zcz_inc = peak_energy_loss(zcz, frequency)
 
 # apas code 1020
-apas = loadmat('apas1020.mat')['codes'][0, :]
+apas = loadmat('data/apas1020.mat')['codes'][0, :]
 apas_loss, apas_inc = peak_energy_loss(apas, frequency)
 
 # random codes 1024
@@ -73,8 +73,13 @@ plt.figure(figsize=[8, 6])
 plt.subplot(211)
 plt.plot(frequency, zcz_loss, lw=2, marker=7, ms=13, label='ZCZ2048')
 plt.plot(frequency, apas_loss, lw=2, marker=6, ms=13, label='APAS1020')
-plt.plot(frequency, random_1024_loss, lw=2, marker='x', ms=13, label='Rand1024')
-plt.plot(frequency, random_2048_loss, lw=2, marker='+', ms=13, label='Rand2048')
+plt.plot(frequency, random_1024_loss, lw=2, marker='x', ms=19, label='Rand1024')
+plt.plot(frequency, random_2048_loss, lw=2, marker='+', ms=19, label='Rand2048')
+# therotical db_value
+theoretical = np.zeros_like(zcz_loss)
+theoretical[0] = 0
+theoretical[1::] = dB(sqrt(2 - 2*cos(2*pi*frequency[1::]))/2/pi/frequency[1::])
+plt.plot(frequency, theoretical, lw=2, marker='o', ms=9, label='Theoretical value')
 plt.legend(loc='lower left')
 plt.grid(ls=':')
 # plt.xlabel(r'$\sigma \displaystyle\frac{v}{v_{\textit{max}}}$')
@@ -96,16 +101,15 @@ plt.plot(frequency, zcz_inc, lw=2, marker=7, ms=13, label='ZCZ2048')
 plt.plot(frequency, apas_inc, lw=2, marker=6, ms=13, label='APAS1020')
 plt.plot(frequency, random_1024_inc, lw=2, marker='x', ms=13, label='Rand1024')
 plt.plot(frequency, random_2048_inc, lw=2, marker='+', ms=13, label='Rand2048')
-# plt.legend(loc='upper left')
+plt.legend(loc='upper left')
 plt.grid(ls=':')
 # plt.xlabel(r'$\sigma \displaystyle\frac{v}{v_{\textit{max}}}$')
 plt.xlabel(r'$\nu$')
 plt.ylabel('Sidelobe energy increment (dB)')
 plt.tight_layout()
 #
-# save_fig = 0
-# if save_fig:
-#     plt.savefig('Energy_change.png', dpi=300)
-
+save_fig = 0
+if save_fig:
+    plt.savefig('Energy_variation.png', dpi=300)
 
 

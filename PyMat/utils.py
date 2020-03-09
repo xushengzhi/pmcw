@@ -4,9 +4,13 @@ Creat on 14/10/2019
 
 Authors: shengzhixu
 
-Email: 
+Email: sz.xu@hotmail.com
+
+Useful functions in this project!
 
 '''
+
+import os
 
 import numpy as np
 import scipy as sp
@@ -15,6 +19,7 @@ from numpy import exp, pi, log2
 from numpy.fft import fft, fftshift, ifftshift, ifft
 from scipy import signal
 from scipy import convolve
+from tqdm import tqdm
 
 from SysParas import *
 
@@ -22,37 +27,53 @@ from SysParas import *
 
 
 # %% Load match code
-def load_matched_code(code_file, verbose=False, win_func=None, compensated=True):
+def load_matched_code(code_file,
+                      verbose=False,
+                      filtering=True,
+                      win_func=None,
+                      fi=INTERMEDIATE_FREQUENCY,
+                      compensated=True,
+                      fisrt_sidelobe_include=True):
     # f = np.linspace(-0.5, 0.5, EFFECTIVE_LENGTH, endpoint=False) * SAMPLING_FREQUENCY
-    demix_wave = exp(-2j * pi * INTERMEDIATE_FREQUENCY * np.arange(EFFECTIVE_LENGTH) / SAMPLING_FREQUENCY)
-    zeroing_length = int(EFFECTIVE_LENGTH / 16)
     wave = np.loadtxt(code_file, delimiter=',')[:, 0]
+    wave_length = wave.size
+    demix_wave = exp(-2j * pi * fi * np.arange(wave_length) / SAMPLING_FREQUENCY)
+    zeroing_length = int(wave_length / 16)
+
     if compensated:
-        w = wave[0:EFFECTIVE_LENGTH] * demix_wave
+        w = wave[0:wave_length] * demix_wave
     else:
-        w = wave[0:EFFECTIVE_LENGTH]
+        w = wave[0:wave_length]
 
-    if win_func is None:
-        pass
-    else:
-        wave_fft = fftshift(fft(w))
-        if win_func is 'rect':
-            wave_fft[0:7 * zeroing_length] = 0
-            wave_fft[9 * zeroing_length::] = 0
+    if filtering:
+        if win_func is None:
+            pass
         else:
-            win_func = eval('signal.windows.' + win_func)
-            print("The windowing function {} is applied for slow time".format(win_func.__name__))
-            win = win_func(wave_fft.size)
-            wave_fft = wave_fft * win
-        w = ifft(ifftshift(wave_fft))
+            wave_fft = fftshift(fft(w))
+            if win_func is 'rect':
+                if fisrt_sidelobe_include:
+                    wave_fft[0:6 * zeroing_length] = 0
+                    wave_fft[10 * zeroing_length::] = 0
+                else:
+                    wave_fft[0:7 * zeroing_length] = 0
+                    wave_fft[9 * zeroing_length::] = 0
+            else:
+                win_func = eval('signal.windows.' + win_func)
+                print("The windowing function {} is applied for slow time".format(win_func.__name__))
+                win = win_func(wave_fft.size)
+                wave_fft = wave_fft * win
+            if verbose:
+                plt.figure()
+                plt.plot(dB(wave_fft))
+            w = ifft(ifftshift(wave_fft))
 
-    # TODO: resample the data from 1.2GHz => SAMPLING_FREQUENCY
+        # TODO: resample the data from 1.2GHz => SAMPLING_FREQUENCY
 
-    if verbose:
-        plt.figure()
-        plt.plot(w.real, label='real part')
-        plt.plot(w.imag, label='imaginary part')
-        plt.legend(loc=1)
+        if verbose:
+            plt.figure()
+            plt.plot(w.real, label='real part')
+            plt.plot(w.imag, label='imaginary part')
+            plt.legend(loc=1)
 
     return w
 
@@ -224,6 +245,27 @@ def random_code(size):
     x[x<=0] = -1
 
     return x
+
+def _save_code(output, file):
+    generator = open(output, 'w+')
+    for i in tqdm(range(file.size)):
+        generator.write(str(file.real[i]))
+        generator.write(', 0, 0\n')
+    generator.close()
+
+
+def save_code(name, code):
+    if os.path.exists(name):
+        ans = input('The file {} already exists.\nDo you want to replace it? (y/n)'.format(name))
+        if ans.lower() == 'y':
+            os.remove(name)
+            _save_code(name, code)
+
+        else:
+            print('The code is not saved!')
+    else:
+        _save_code(name, code)
+
 
 if __name__ == '__main__':
     a = np.random.randint(0, 10, size=np.random.randint(2, 15))

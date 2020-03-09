@@ -157,11 +157,11 @@ def range_doppler_show(data,
 
 
 # %% Doppler compensation
-def doppler_compensation(data, fft_zoom=1, downsampling_rate=1):
+def doppler_compensation(data, downsampling_rate=1, pri=1e-3):
 
     print("\nDoppler shifts compensation started ...")
-    vm = C / 4 / CARRIER_FREQUENCY / PERIOD_DURATION
-    doppler_cells = data.shape[1]*fft_zoom
+    vm = C / 4 / CARRIER_FREQUENCY / pri
+    doppler_cells = data.shape[1]
     v_vector = np.linspace(-vm, vm, doppler_cells, endpoint=False).reshape(1, doppler_cells)
 
     print("Maximum Doppler shifts is {}Hz".format(1/2/PERIOD_DURATION))
@@ -246,7 +246,7 @@ if __name__ == '__main__':
                                   fft_zoom=fft_zoom,
                                   shifted=True)
 
-    compensation_data4 = doppler_compensation(doppler_data4)
+    compensation_data4 = doppler_compensation(doppler_data4, pri=PERIOD_DURATION)
 
     range_data4 = fast_time_correlation(compensation_data4,
                                         matched_code=matched_code,
